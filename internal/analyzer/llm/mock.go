@@ -1,11 +1,16 @@
 package llm
 
-import "context"
+import (
+	"context"
 
-type MockClient struct {
-	Response string
+	"github.com/podwhy/podwhy/internal/observer"
+)
+
+type MockProvider struct {
+	Response *LLMResponse
+	Err      error
 }
 
-func (m *MockClient) Ask(ctx context.Context, prompt string) (string, error) {
-	return m.Response, nil
+func (m *MockProvider) Ask(ctx context.Context, podCtx *observer.PodContext) (*LLMResponse, error) {
+	return m.Response, m.Err
 }
