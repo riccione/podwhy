@@ -1,12 +1,10 @@
 package observer
 
 import (
-	"bytes"
-
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/util/json"
+	"sigs.k8s.io/yaml"
 )
 
 func SanitizePod(pod *v1.Pod) (*v1.Pod, error) {
@@ -34,13 +32,17 @@ func PodToYAML(pod *v1.Pod) (string, error) {
 
 	delete(obj, "managedFields")
 
-	var buf bytes.Buffer
-	enc := yaml.NewYAMLOrJSONEncoder(&buf, yaml.SimpleMetaFactory{})
-	if err := enc.Encode(obj); err != nil {
+	data, err := json.Marshal(obj)
+	if err != nil {
 		return "", err
 	}
 
-	return buf.String(), nil
+	yamlBytes, err := yaml.JSONToYAML(data)
+	if err != nil {
+		return "", err
+	}
+
+	return string(yamlBytes), nil
 }
 
 func IsHealthy(warnings []string) bool {
