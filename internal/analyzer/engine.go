@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/podwhy/podwhy/internal/analyzer/llm"
@@ -12,18 +11,18 @@ import (
 
 type Engine struct {
 	ruleEngine *rules.Engine
-	llmEngine  *llm.Client
+	llmEngine  *llm.LLMProvider
 }
 
 func NewAnalyzer(model string) (*Engine, error) {
-	llmClient, err := llm.NewClient(model)
+	llmProvider, err := llm.NewProvider(model)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create LLM client: %w", err)
+		return nil, fmt.Errorf("failed to create LLM provider: %w", err)
 	}
 
 	return &Engine{
 		ruleEngine: rules.NewEngine(),
-		llmEngine:  llmClient,
+		llmEngine:  llmProvider,
 	}, nil
 }
 
@@ -37,40 +36,15 @@ func (e *Engine) Diagnose(ctx context.Context, podCtx *observer.PodContext) (*Di
 		}, nil
 	}
 
-	llmDiagnosis, err := e.askLLM(ctx, podCtx)
+	llmResult, err := e.llmEngine.Ask(ctx, podCtx)
 	if err != nil {
 		return nil, fmt.Errorf("LLM failed: %w", err)
 	}
 
-	llmDiagnosis.Source = "LLMEngine"
-	return llmDiagnosis, nil
-}
-
-func (e *Engine) askLLM(ctx context.Context, podCtx *observer.PodContext) (*Diagnosis, error) {
-	prompt := llm.BuildPrompt(podCtx)
-
-	response, err := e.llmEngine.Ask(ctx, prompt)
-	if err != nil {
-		return nil, err
-	}
-
-	var result struct {
-		RootCause   string `json:"root_cause"`
-		Remediation string `json:"remediation"`
-		ActionCmd   string `json:"action_cmd"`
-	}
-
-	if err := json.Unmarshal([]byte(response), &result); err != nil {
-		return &Diagnosis{
-			RootCause:   "LLM analysis completed",
-			Remediation: response,
-			ActionCmd:   "",
-		}, nil
-	}
-
 	return &Diagnosis{
-		RootCause:   result.RootCause,
-		Remediation: result.Remediation,
-		ActionCmd:   result.ActionCmd,
+		Source:      "LLMEngine",
+		RootCause:   llmResult.RootCause,
+		Remediation: llmResult.Remediation,
+		ActionCmd:   llmResult.ActionCmd,
 	}, nil
 }
