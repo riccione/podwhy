@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/podwhy/podwhy/internal/observer"
 	"github.com/podwhy/podwhy/internal/analyzer/llm"
 	"github.com/podwhy/podwhy/internal/analyzer/rules"
+	"github.com/podwhy/podwhy/internal/observer"
 )
 
 type Engine struct {
@@ -28,13 +28,15 @@ func NewAnalyzer(model string) (*Engine, error) {
 }
 
 func (e *Engine) Diagnose(ctx context.Context, podCtx *observer.PodContext) (*Diagnosis, error) {
-	// 1. Try Rule Engine first
-	if diagnosis, found := e.ruleEngine.Check(podCtx); found {
-		diagnosis.Source = "RuleEngine"
-		return diagnosis, nil
+	if result, found := e.ruleEngine.Check(podCtx); found {
+		return &Diagnosis{
+			Source:      "RuleEngine",
+			RootCause:   result.RootCause,
+			Remediation: result.Remediation,
+			ActionCmd:   result.ActionCmd,
+		}, nil
 	}
 
-	// 2. Fallback to LLM
 	llmDiagnosis, err := e.askLLM(ctx, podCtx)
 	if err != nil {
 		return nil, fmt.Errorf("LLM failed: %w", err)
@@ -52,7 +54,6 @@ func (e *Engine) askLLM(ctx context.Context, podCtx *observer.PodContext) (*Diag
 		return nil, err
 	}
 
-	// Parse JSON response from LLM
 	var result struct {
 		RootCause   string `json:"root_cause"`
 		Remediation string `json:"remediation"`
@@ -60,7 +61,6 @@ func (e *Engine) askLLM(ctx context.Context, podCtx *observer.PodContext) (*Diag
 	}
 
 	if err := json.Unmarshal([]byte(response), &result); err != nil {
-		// If JSON parsing fails, return raw response
 		return &Diagnosis{
 			RootCause:   "LLM analysis completed",
 			Remediation: response,

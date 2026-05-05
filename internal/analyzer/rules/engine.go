@@ -1,17 +1,22 @@
 package rules
 
 import (
-	"github.com/podwhy/podwhy/internal/analyzer"
 	"github.com/podwhy/podwhy/internal/observer"
 )
 
+type RuleResult struct {
+	RootCause   string
+	Remediation string
+	ActionCmd   string
+}
+
 type Engine struct {
-	rules []func(*observer.PodContext) (*analyzer.Diagnosis, bool)
+	rules []func(*observer.PodContext) (*RuleResult, bool)
 }
 
 func NewEngine() *Engine {
 	return &Engine{
-		rules: []func(*observer.PodContext) (*analyzer.Diagnosis, bool){
+		rules: []func(*observer.PodContext) (*RuleResult, bool){
 			checkOOM,
 			checkImagePull,
 			checkCrashLoop,
@@ -20,10 +25,10 @@ func NewEngine() *Engine {
 	}
 }
 
-func (e *Engine) Check(podCtx *observer.PodContext) (*analyzer.Diagnosis, bool) {
+func (e *Engine) Check(podCtx *observer.PodContext) (*RuleResult, bool) {
 	for _, rule := range e.rules {
-		if diagnosis, found := rule(podCtx); found {
-			return diagnosis, true
+		if result, found := rule(podCtx); found {
+			return result, true
 		}
 	}
 	return nil, false

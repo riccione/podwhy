@@ -3,16 +3,13 @@ package rules
 import (
 	"fmt"
 
-	"github.com/podwhy/podwhy/internal/analyzer"
 	"github.com/podwhy/podwhy/internal/observer"
 )
 
-func checkOOM(podCtx *observer.PodContext) (*analyzer.Diagnosis, bool) {
-	// Parse the YAML to check container statuses
-	// For simplicity, we check events for OOM hints
+func checkOOM(podCtx *observer.PodContext) (*RuleResult, bool) {
 	for _, event := range podCtx.Events {
 		if contains(event, "OOMKilled") || contains(event, "OutOfMemory") {
-			return &analyzer.Diagnosis{
+			return &RuleResult{
 				RootCause:   "Container was terminated due to OOMKilled",
 				Remediation: "Increase memory limits/requests for the container",
 				ActionCmd:   fmt.Sprintf("kubectl set resources pod %s -n %s --limits=memory=<new-limit>", podCtx.PodName, podCtx.Namespace),
