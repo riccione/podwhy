@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/podwhy/podwhy/internal/analyzer"
 	"github.com/podwhy/podwhy/internal/observer"
 	"github.com/spf13/cobra"
 )
@@ -17,6 +18,7 @@ var rootCmd = &cobra.Command{
 		podName := args[0]
 		namespace, _ := cmd.Flags().GetString("namespace")
 		debug, _ := cmd.Flags().GetBool("debug")
+		model, _ := cmd.Flags().GetString("model")
 
 		client, err := observer.NewClient()
 		if err != nil {
@@ -34,18 +36,35 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("failed to fetch events: %w", err)
 		}
 
-		ctx2 := observer.NewPodContext(pod, warnings, "")
+		podCtx := observer.NewPodContext(pod, warnings, "")
 
 		if observer.IsHealthy(warnings) {
 			fmt.Println("Pod is healthy - no warnings detected")
 			return nil
 		}
 
+		engine, err := analyzer.NewAnalyzer(model)
+		if err != nil {
+			return fmt.Errorf("failed to create analyzer: %w", err)
+		}
+
+		diagnosis, err := engine.Diagnose(ctx, podCtx)
+		if err != nil {
+			return fmt.Errorf("diagnosis failed: %w", err)
+		}
+
+		fmt.Printf("Source: %s\n", diagnosis.Source)
+		fmt.Printf("Root Cause: %s\n", diagnosis.RootCause)
+		fmt.Printf("Remediation: %s\n", diagnosis.Remediation)
+		if diagnosis.ActionCmd != "" {
+			fmt.Printf("Action: %s\n", diagnosis.ActionCmd)
+		}
+
 		if debug {
-			fmt.Println("--- Cleaned Pod YAML ---")
-			fmt.Println(ctx2.CleanedYAML)
+			fmt.Println("\n--- Cleaned Pod YAML ---")
+			fmt.Println(podCtx.CleanedYAML)
 			fmt.Println("--- Warning Events ---")
-			for _, w := range ctx2.Events {
+			for _, w := range podCtx.Events {
 				fmt.Println(w)
 			}
 		}
@@ -57,6 +76,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.Flags().StringP("namespace", "n", "default", "Kubernetes namespace")
 	rootCmd.Flags().BoolP("debug", "d", false, "Print cleaned YAML and events")
+	rootCmd.Flags().StringP("model", "m", "phi3", "LLM model name")
 }
 
 func Execute() {
